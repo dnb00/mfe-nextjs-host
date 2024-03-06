@@ -1,13 +1,65 @@
-import { Html, Head, Main, NextScript } from "next/document";
+import Document, {
+  Html,
+  Head,
+  Main,
+  NextScript,
+  DocumentContext,
+} from 'next/document';
+import React from 'react';
+import {
+  revalidate,
+  FlushedChunks,
+  flushChunks,
+} from '@module-federation/nextjs-mf/utils';
+import { ServerStyleSheet } from 'styled-components';
 
-export default function Document() {
-  return (
-    <Html lang="en">
-      <Head />
-      <body>
-        <Main />
-        <NextScript />
-      </body>
-    </Html>
-  );
+class MyDocument extends Document {
+  static async getInitialProps(ctx: DocumentContext) {
+    const sheet = new ServerStyleSheet();
+
+    if (
+      process.env.NODE_ENV === 'development' &&
+      !(ctx.req?.url ?? '').includes('_next')
+    ) {
+      await revalidate().then((shouldReload) => {
+        if (shouldReload) {
+          ctx.res?.writeHead(302, { Location: ctx.req?.url });
+          ctx.res?.end();
+        }
+      });
+    } else {
+      ctx?.res?.on('finish', () => {
+        revalidate();
+      });
+    }
+    const initialProps = await Document.getInitialProps(ctx);
+    const styles = sheet.getStyleElement();
+    const chunks = await flushChunks();
+
+    return {
+      ...initialProps,
+      chunks,
+      styles,
+    };
+  }
+
+  render() {
+    return (
+      <Html>
+        <Head>
+          <meta name="robots" content="noindex" />
+          {this.props.styles}
+          {/*@ts-ignore*/}
+          <FlushedChunks chunks={this.props.chunks} />
+        </Head>
+
+        <body className="bg-background-grey">
+          <Main />
+          <NextScript />
+        </body>
+      </Html>
+    );
+  }
 }
+
+export default MyDocument;
