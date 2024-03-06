@@ -16,6 +16,7 @@ import { ServerStyleSheet } from 'styled-components';
 class MyDocument extends Document {
   static async getInitialProps(ctx: DocumentContext) {
     const sheet = new ServerStyleSheet();
+    const originalRenderPage = ctx.renderPage;
 
     if (
       process.env.NODE_ENV === 'development' &&
@@ -32,6 +33,12 @@ class MyDocument extends Document {
         revalidate();
       });
     }
+
+    ctx.renderPage = () =>
+      originalRenderPage({
+        enhanceApp: (App) => (props) => sheet.collectStyles(<App {...props} />),
+      });
+
     const initialProps = await Document.getInitialProps(ctx);
     const styles = sheet.getStyleElement();
     const chunks = await flushChunks();
